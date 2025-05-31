@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Visual GraphRAG</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://unpkg.com/cytoscape@3.25.0/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+  <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <style>
+    .legend {
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .legend-item {
+      display: inline-block;
+      margin-right: 15px;
+      margin-bottom: 5px;
+    }
+    .legend-color {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-bar">
+    <div class="tabs">
+      <a href="/" class="tab">Chat</a>
+      <a href="/graphrag" class="tab">Explanatory GraphRAG</a>
+      <a href="/visualgraph" class="tab active-tab">Visual GraphRAG</a>
+    </div>
+  </div>
+
+  <div id="visualgraphTab" class="tab-content active">
+    <h2>Visual GraphRAG Viewer</h2>
+    <div class="graphrag-input">
+      <input type="text" id="visual_query" placeholder="Enter keyword (or click Show All)" oninput="toggleSearchButton()" autofocus />
+      <button id="visual_search_btn" onclick="runGraphVisual()" disabled>Search</button>
+      <button onclick="runGraphShowAll()">Show All</button>
+    </div>
+    <div id="graph_display"></div>
+    <div id="graph_legend" class="legend"></div>
+  </div>
+
+  <script src="/static/shared-tabs.js"></script>
+  <script>
+    let nodeTypeColors = {};
+    const colorPalette = ['#6BAED6', '#74C476', '#FD8D3C', '#9E9AC8', '#FDD0A2', '#8DD3C7', '#f06292', '#ba68c8'];
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const input = document.getElementById("visual_query");
+      const searchBtn = document.getElementById("visual_search_btn");
+
+      input.addEventListener("input", () => {
+        searchBtn.disabled = input.value.trim() === "";
+      });
+
+      input.addEventListener("keypress", event => {
+        if (event.key === "Enter" && !searchBtn.disabled) runGraphVisual();
+      });
+
+      input.focus();
+
+      window.runGraphVisual = () => {
+        const query = input.value.trim();
+        fetchAndRenderGraph(query);
+      };
+
+      window.runGraphShowAll = () => {
+        fetchAndRenderGraph("");
+      };
+    });
+
+    async function fetchAndRenderGraph(query = "") {
+      const container = document.getElementById("graph_display");
+      const legend = document.getElementById("graph_legend");
+
+      container.innerHTML = `<div style="
+        color: #eee;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        padding: 40px;
+      ">Loading graph...</div>`;
+
+      try {
+        const res = await fetch("/graphrag_graph_data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+
+        const data = await res.json();
+        container.innerHTML = "";
+        nodeTypeColors = {};
+        let colorIdx = 0;
+
+        const nodes = data.nodes.map(n => {
+          const type = n.type || 'default';
+          if (!nodeTypeColors[type]) {
+            nodeTypeColors[type] = colorPalette[colorIdx++ % colorPalette.length];
+          }
+          return {
+            data: { id: n.id, label: n.label, type },
+            classes: type
+          };
+        });
+
+        const edges = data.edges.map(e => ({
+          data: {
+            id: `${e.from}_${e.to}`,
+            source: e.from,
+            target: e.to,
+            label: e.label
+          }
+        }));
+
+        const cy = cytoscape({
+          container: container,
+          elements: [...nodes, ...edges],
+          layout: {
+            name: 'dagre',
+            rankDir: 'LR',
+            nodeSep: 70,
+            edgeSep: 30,
+            rankSep: 120,
+            animate: true,
+            animationDuration: 500
+          },
+          style: [
+            {
+              selector: 'node',
+              style: {
+                'label': 'data(label)',
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'font-size': 14,
+                'font-weight': 'normal',
+                'color': '#000',
+                'background-color': ele => nodeTypeColors[ele.data().type] || '#888',
+                'shape': 'roundrectangle',
+                'padding': '10px',
+                'text-wrap': 'wrap',
+                'text-max-width': 120,
+                'width': 'label',
+                'height': 'label'
+              }
+            },
+            {
+              selector: 'edge',
+              style: {
+                'curve-style': 'bezier',
+                'target-arrow-shape': 'triangle',
+                'line-color': '#bbb',
+                'target-arrow-color': '#bbb',
+                'label': 'data(label)',
+                'font-size': 10,
+                'text-rotation': 'autorotate',
+                'text-background-color': '#fff',
+                'text-background-opacity': 1,
+                'text-background-padding': 3,
+                'color': '#333'
+              }
+            },
+            {
+              selector: '.faded',
+              style: {
+                'opacity': 0.1,
+                'text-opacity': 0.1
+              }
+            }
+          ],
+          minZoom: 0.2,
+          maxZoom: 2.5,
+          wheelSensitivity: 0.1,
+          motionBlur: true
+        });
+
+        cy.fit();
+
+        cy.on('tap', 'node', evt => {
+          const node = evt.target;
+          const neighborhood = node.closedNeighborhood();
+          cy.elements().addClass('faded');
+          neighborhood.removeClass('faded');
+        });
+
+        cy.on('tap', evt => {
+          if (evt.target === cy) {
+            cy.elements().removeClass('faded');
+          }
+        });
+
+        legend.innerHTML = Object.entries(nodeTypeColors).map(([type, color]) => `
+          <span class="legend-item">
+            <span class="legend-color" style="background:${color}"></span>${type}
+          </span>
+        `).join('');
+
+      } catch (err) {
+        container.innerHTML = `<div style="
+          color: #ffaaaa;
+          font-weight: bold;
+          text-align: center;
+          padding: 40px;
+        ">Failed to load graph.</div>`;
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>

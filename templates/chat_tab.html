@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Font for headings -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Georgia&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="header-bar">
+    <div class="tabs">
+      <a href="/" class="tab active-tab">Chat</a>
+      <a href="/graphrag" class="tab">Explanatory GraphRAG</a>
+      <a href="/visualgraph" class="tab">Visual GraphRAG</a>
+    </div>
+  </div>
+
+  <div id="chatTab" class="tab-content active">
+    <h2>GraphRAG and More</h2>
+
+    <div id="pipeline_selection">
+      <label for="pipeline">Choose a pipeline:</label>
+      <select id="pipeline">
+        <option value="conversational_agent">Conversational Agent</option>
+        <option value="graph">GraphRAG</option>
+        <option value="web">Web Search</option>
+        <option value="rag">RAG</option>
+      </select>
+      <button id="clearChatBtn">🧹 Clear Chat</button>
+    </div>
+
+    <div id="chat_display">
+      <div id="welcome_message" class="welcome-message">👩🏻‍💻 Welcome to the chat!</div>
+    </div>
+
+    <div id="user_input_section">
+      <input type="text" id="user_input" placeholder="Ask a question" onkeypress="handleKeyPress(event)" />
+      <button id="sendBtn" onclick="sendQuestion()" disabled>
+        <span id="sendText">Send</span>
+        <span id="loadingSpinner" class="spinner" style="display:none;"></span>
+      </button>
+    </div>
+  </div>
+
+  <script src="/static/shared-tabs.js"></script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const input = document.getElementById("user_input");
+      const sendBtn = document.getElementById("sendBtn");
+      const clearBtn = document.getElementById("clearChatBtn");
+      const chatDisplay = document.getElementById("chat_display");
+
+      input.addEventListener("input", () => {
+        sendBtn.disabled = input.value.trim() === "";
+      });
+
+      clearBtn.onclick = () => {
+        localStorage.removeItem("chat_history");
+        chatDisplay.innerHTML = "";
+        location.reload();
+      };
+
+      input.focus();
+      restoreChatHistory();
+    });
+
+    function handleKeyPress(event) {
+      if (event.key === "Enter" && !document.getElementById("sendBtn").disabled) {
+        sendQuestion();
+      }
+    }
+
+    function formatTimestamp() {
+      const now = new Date();
+      return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function addChatMessage(sender, text) {
+      const chatDisplay = document.getElementById("chat_display");
+      const messageDiv = document.createElement("div");
+      messageDiv.className = `chat-message ${sender}`;
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = sender === "bot" ? "🤖" : "🧑‍💻";
+
+      const messageText = document.createElement("div");
+      messageText.className = "message-bubble";
+
+      if (sender === "bot") {
+        const html = window.marked ? marked.parse(text) : text;
+        const wrapper = document.createElement("div");
+        wrapper.className = "markdown-response";
+        wrapper.innerHTML = html;
+        messageText.appendChild(wrapper);
+      } else {
+        messageText.textContent = text;
+      }
+
+      const timestamp = document.createElement("div");
+      timestamp.className = "timestamp";
+      timestamp.textContent = formatTimestamp();
+      messageText.appendChild(timestamp);
+
+      messageDiv.appendChild(avatar);
+      messageDiv.appendChild(messageText);
+      chatDisplay.appendChild(messageDiv);
+      chatDisplay.scrollTop = chatDisplay.scrollHeight;
+
+      saveChatMessage(sender, text);
+    }
+
+    function addLoadingIndicator() {
+      const chatDisplay = document.getElementById("chat_display");
+      const loadingDiv = document.createElement("div");
+      loadingDiv.className = "chat-message bot loading";
+      loadingDiv.innerHTML = "<span class='dot'>.</span><span class='dot'>.</span><span class='dot'>.</span>";
+      chatDisplay.appendChild(loadingDiv);
+      chatDisplay.scrollTop = chatDisplay.scrollHeight;
+      return loadingDiv;
+    }
+
+    function removeLoadingIndicator(indicator) {
+      if (indicator) indicator.remove();
+    }
+
+    async function sendQuestion() {
+      const input = document.getElementById("user_input");
+      const question = input.value.trim();
+      const pipeline = document.getElementById("pipeline").value;
+      const sendBtn = document.getElementById("sendBtn");
+
+      if (!question) return;
+
+      addChatMessage("user", question);
+      input.value = "";
+      sendBtn.disabled = true;
+      document.getElementById("sendText").style.display = "none";
+      document.getElementById("loadingSpinner").style.display = "inline-block";
+
+      const loadingIndicator = addLoadingIndicator();
+
+      try {
+        const endpoint = pipeline === "conversational_agent" ? "/chat_agent" : "/chat";
+        const body = pipeline === "conversational_agent"
+          ? JSON.stringify({ question })
+          : JSON.stringify({ question, pipeline });
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body
+        });
+
+        removeLoadingIndicator(loadingIndicator);
+
+        if (response.ok) {
+          const data = await response.json();
+          const botResponse = data.response || "No response provided.";
+          addChatMessage("bot", botResponse);
+
+          if (pipeline === "conversational_agent" && data.tool_results) {
+            renderToolResults(data.tool_results);
+          }
+        } else {
+          addChatMessage("bot", "Error: Unable to get a response.");
+        }
+      } catch (error) {
+        console.error("Chat error:", error);
+        removeLoadingIndicator(loadingIndicator);
+        addChatMessage("bot", "Error: Unable to get a response.");
+      } finally {
+        document.getElementById("sendText").style.display = "inline";
+        document.getElementById("loadingSpinner").style.display = "none";
+      }
+    }
+
+    function renderToolResults(toolResults) {
+      const chatDisplay = document.getElementById("chat_display");
+      const container = document.createElement("div");
+      container.className = "tool-results collapsed";
+
+      const header = document.createElement("div");
+      header.className = "tool-header";
+      header.textContent = "🔧 Latest Tool Results (Agent)";
+      header.onclick = () => container.classList.toggle("collapsed");
+
+      const content = document.createElement("div");
+      content.className = "tool-content";
+
+      for (const [tool, output] of Object.entries(toolResults)) {
+        const toolItem = document.createElement("div");
+        toolItem.className = "tool-item";
+        toolItem.innerHTML = `<strong>${tool}</strong>: ${marked.parse(output)}`;
+        content.appendChild(toolItem);
+      }
+
+      container.appendChild(header);
+      container.appendChild(content);
+      chatDisplay.appendChild(container);
+      chatDisplay.scrollTop = chatDisplay.scrollHeight;
+    }
+
+    function restoreChatHistory() {
+      const chatHistory = JSON.parse(localStorage.getItem("chat_history") || "[]");
+      if (chatHistory.length === 0) {
+        document.getElementById("welcome_message").style.display = "flex";
+      } else {
+        chatHistory.forEach(({ sender, text }) => addChatMessage(sender, text));
+      }
+    }
+
+    function saveChatMessage(sender, text) {
+      const chatHistory = JSON.parse(localStorage.getItem("chat_history") || "[]");
+      chatHistory.push({ sender, text });
+      localStorage.setItem("chat_history", JSON.stringify(chatHistory));
+    }
+  </script>
+</body>
+</html>

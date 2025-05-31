@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Explanatory GraphRAG</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="header-bar">
+    <div class="tabs">
+      <a href="/" class="tab">Chat</a>
+      <a href="/graphrag" class="tab active-tab">Explanatory GraphRAG</a>
+      <a href="/visualgraph" class="tab">Visual GraphRAG</a>
+    </div>
+  </div>
+
+  <div id="graphragTab" class="tab-content active">
+    <h2>GraphRAG Explorer</h2>
+    <div class="graphrag-input">
+      <input type="text" id="graphrag_query" placeholder="Enter a keyword (e.g., 'ocean')" oninput="toggleSearchButton()" autofocus />
+      <button id="graphrag_search_btn" onclick="runGraphRag()" disabled>Search</button>
+    </div>
+    <div id="graphrag_results" class="graphrag-results"></div>
+  </div>
+
+  <script src="/static/shared-tabs.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const input = document.getElementById("graphrag_query");
+      const button = document.getElementById("graphrag_search_btn");
+
+      input.addEventListener("input", () => {
+        button.disabled = input.value.trim() === "";
+      });
+
+      input.addEventListener("keypress", event => {
+        if (event.key === "Enter" && !button.disabled) runGraphRag();
+      });
+
+      input.focus();
+    });
+
+    async function runGraphRag() {
+      const query = document.getElementById("graphrag_query").value.trim();
+      const resultsBox = document.getElementById("graphrag_results");
+
+      if (!query) return;
+
+      resultsBox.innerHTML = "Loading...";
+
+      try {
+        const res = await fetch("/graphrag_explain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+
+        if (!res.ok) {
+          resultsBox.innerHTML = "Error fetching graph data.";
+          return;
+        }
+
+        const { results } = await res.json();
+        if (!results.length) {
+          resultsBox.innerHTML = "No relationships found.";
+          return;
+        }
+
+        resultsBox.innerHTML = results.map((item, i) => `
+          <div class="graph-item">
+            <strong>${i + 1}.</strong> 
+            <code>${item.node.id}</code> —[<em>${item.relation.type || "RELATION"}</em>]→ 
+            <code>${item.connected.id}</code>
+          </div>
+        `).join("");
+
+      } catch (err) {
+        console.error("GraphRAG error:", err);
+        resultsBox.innerHTML = "Unexpected error.";
+      }
+    }
+  </script>
+</body>
+</html>
