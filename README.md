@@ -4,6 +4,19 @@ This repository has been established in conjunction with the publication of the 
 
 ### Citation
 ```bibtex
+@Article{app15116315,
+AUTHOR = {Papageorgiou, George and Sarlis, Vangelis and Maragoudakis, Manolis and Tjortjis, Christos},
+TITLE = {Hybrid Multi-Agent GraphRAG for E-Government: Towards a Trustworthy AI Assistant},
+JOURNAL = {Applied Sciences},
+VOLUME = {15},
+YEAR = {2025},
+NUMBER = {11},
+ARTICLE-NUMBER = {6315},
+URL = {https://www.mdpi.com/2076-3417/15/11/6315},
+ISSN = {2076-3417},
+ABSTRACT = {As public institutions increasingly adopt AI-driven virtual assistants to support transparency and citizen engagement, the need for explainable, accurate, and context-aware language systems becomes vital. While traditional retrieval-augmented generation (RAG) frameworks effectively integrate external knowledge into Large Language Models (LLMs), their reliance on flat, unstructured document retrieval limits multi-hop reasoning and interpretability, especially with complex, structured e-government datasets. This study introduces a modular, extensible, multi-agent graph retrieval-augmented generation (GraphRAG) framework designed to enhance policy-focused question answering. This research aims to provide an overview of hybrid multi-agent GraphRAG architecture designed for operational deployment in e-government settings to support explainable AI systems. The study focuses on how the hybrid integration of standard RAG, embedding-based retrieval, real-time web search, and LLM-generated structured Graphs can optimize knowledge discovery from public e-government data, thereby reinforcing factual grounding, reducing hallucinations, and enhancing the quality of complex responses. To validate the proposed approach, we implement and evaluate the framework using the European Commission’s Press Corner as a data source, constructing graph-based knowledge representations and embeddings, and incorporating web search. This work establishes a reproducible blueprint for deploying AI systems in e-government that require structured reasoning in comprehensive and factually accurate question answering.},
+DOI = {10.3390/app15116315}
+}
 ```
 
 ## Introduction
@@ -52,7 +65,7 @@ Example indexing and querying pipelines, along with LLM-based faithfulness evalu
 
 This repository contains the following structure:
 
-- **`RAG_Multi_Agent_demo.ipynb`**: The Jupyter Notebook usable from Google Colab that contains the main code and demonstrations for using the application with documentation.
+- **`GraphRAG_demo.ipynb`**: The Jupyter Notebook usable from Google Colab that contains the main code and demonstrations for using the application with documentation.
 
 - **`templates/`**: This directory contains HTML templates used by the FastAPI application to render web pages.
 
