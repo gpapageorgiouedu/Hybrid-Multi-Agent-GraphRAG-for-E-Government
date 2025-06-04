@@ -1,6 +1,6 @@
 # Hybrid-Multi-Agent-GraphRAG-for-E-Government
 
-This repository has been established in conjunction with the publication of the research paper titled **Hybrid Multi-Agent GraphRAG for E-Government: Toward a Trustworthy AI Assistant** and serves as a supplementary resource for researchers interested in creating GraphRAG in Multi-Agent systems. Our example use case is dedicated to E-Government Services.
+This repository has been established in conjunction with the publication of the research paper titled [Hybrid Multi-Agent GraphRAG for E-Government: Toward a Trustworthy AI Assistant](https://www.mdpi.com/2076-3417/15/11/6315) and serves as a supplementary resource for researchers interested in creating GraphRAG in Multi-Agent systems. Our example use case is dedicated to E-Government Services.
 
 ### Citation
 ```bibtex
